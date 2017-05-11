@@ -49,7 +49,7 @@ public class Mine : MonoBehaviour
 		Instantiate (explosion, gameObject.transform.position, new Quaternion ());
 		SetColor (Color.clear);
 
-//		Destroy (gameObject);
+		Destroy (gameObject);
 	}
 
 	void OnSelect() {
@@ -90,7 +90,7 @@ public class Mine : MonoBehaviour
 	}
 		
 	void Update(){
-		Color newColor = Color.red;
+		Color newColor = new Color (1f, 0.309803922f, 0f, 1f);
 
 		if (isTargeted){
 			if (Input.GetMouseButtonUp (0)) {
@@ -110,11 +110,11 @@ public class Mine : MonoBehaviour
 			if (isTargeted && !isExposed) {
 				newColor = Color.yellow;
 			} else {
-				newColor = Color.red;
+				newColor = new Color (1f, 0.309803922f, 0f, 1f);
 			}
 		}
 
-		if (isSolid || isTargeted) {
+		if (isSolid) {
 			newColor.a = 1f;
 		} else {
 			newColor.a = 0.1f;
@@ -124,8 +124,9 @@ public class Mine : MonoBehaviour
 	}
 
 	void SetColor(Color newColor){
-		mr.material.color = newColor;
-//		mr.material.SetColor ("_EmissionColor", Color.clear);
+		mr.material.SetColor ("_Color", Color.Lerp (mr.material.color, newColor, Time.deltaTime * 5f));
+//		newColor.a = 0.25f;
+//		mr.material.SetColor ("_Emission", newColor);
 	}
 
 	void OnMouseEnter () {
