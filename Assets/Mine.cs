@@ -29,8 +29,14 @@ public class Mine : MonoBehaviour
 	private bool isExposed = false;
 
 	public GameObject explosion;
+//	public GameObject clickParticles;
+//	public GameObject particles;
 
 	void Start(){
+//		particles = Resources.Load ("ClickParticles") as GameObject;
+
+		gameObject.isStatic = true;
+
 		mr = GetComponent<MeshRenderer> ();
 		mr.material.EnableKeyword ("_EMISSION");
 
@@ -60,11 +66,19 @@ public class Mine : MonoBehaviour
 	}
 
 	void OnSelect() {
+		OnSelect (false, false);
+	}
+
+	void OnAutoSelect(){
+		OnSelect (true, true);
+	}
+
+	void OnSelect(bool ignoreFocus, bool dontUseParticles) {
 		if (Input.GetKey (KeyCode.LeftShift)) {
 			isSolid = true;
 			field.FocusAround (mineCoords, true);
 			field.FocusCamera (transform);
-		} else if (status == MineStatus.Flagged) {
+		} else if ((!ignoreFocus && !isSolid) || status == MineStatus.Flagged) {
 			return;
 		} else if (isMine) {
 			field.BombExploded ();
@@ -73,11 +87,17 @@ public class Mine : MonoBehaviour
 			isExposed = true;
 			isTargeted = false;
 
+//			if (!dontUseParticles) {
+//				clickParticles = Instantiate (particles, transform);
+//				clickParticles.transform.position = transform.position;
+//				clickParticles.GetComponent<ParticleSystem> ().Play ();
+//			}
+
 			// if this node doesn't have any mines, we click around its neighbors until we hit a 'border'
 			if (mineCount == 0) {
 				List<Mine> neighbors = field.GetNeighborsOfPoint (mineCoords);
 				foreach (Mine bor in neighbors) {
-					bor.OnSelect ();
+					bor.OnAutoSelect ();
 				}
 
 				Destroy (gameObject);
@@ -96,7 +116,8 @@ public class Mine : MonoBehaviour
 	void Update(){
 		Color newColor = NeutralState;
 
-		if (isTargeted){
+
+		if (isTargeted) {
 			if (Input.GetMouseButtonUp (0)) {
 				OnSelect ();
 			} else if (!isExposed && Input.GetMouseButtonUp (1)) {
@@ -115,6 +136,24 @@ public class Mine : MonoBehaviour
 				newColor = TargetedState;
 			} else if (isExposed) {
 				newColor = RevealedState;
+//				float r = RevealedState.r;
+//				float g = RevealedState.g;
+//				float b = RevealedState.b;
+//
+//				Color flagged = new Color (FlaggedState.r, FlaggedState.g, FlaggedState.b);
+//				float h;
+//				float s;
+//				float v;
+//				Color.RGBToHSV (FlaggedState, out h, out s, out v);
+//				flagged = Color.HSVToRGB (h, s, v);
+//
+//				r += flagged.r;
+//				g += flagged.g;
+//				b += flagged.b;
+//
+//				float factor = 2 * (mineCount / 26);
+//
+//				newColor = new Color (r / factor, g / factor, b / factor);
 			} else {
 				newColor = NeutralState;
 			}
@@ -126,6 +165,7 @@ public class Mine : MonoBehaviour
 			newColor.a = 0.25f;
 		}
 
+		transform.localScale = Vector3.Lerp (transform.localScale, Vector3.one * (isTargeted && Input.GetMouseButton (0) ? 0.95f : 1f), Time.deltaTime * 30f);
 		SetColor (newColor);
 	}
 

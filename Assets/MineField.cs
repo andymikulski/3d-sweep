@@ -9,6 +9,7 @@ public class MineField : MonoBehaviour {
 	public GameObject mineFab;
 	private Mine[,,] field;
 
+	public float Ratio = 0.15f;
 
 	private Transform lastTarget;
 	private Transform currentTarget;
@@ -16,8 +17,11 @@ public class MineField : MonoBehaviour {
 	private Vector3 lastFocus;
 	private Vector3 currentFocus;
 
+	private OcclusionArea occlusion;
+
 	// Use this for initialization
 	void Start () {
+		occlusion = gameObject.AddComponent<OcclusionArea> ();
 		Reset ();
 	}
 
@@ -38,7 +42,7 @@ public class MineField : MonoBehaviour {
 
 					Mine newMine = cube.GetComponent<Mine>();
 					newMine.field = this;
-					newMine.isMine = UnityEngine.Random.value < 0.15;
+					newMine.isMine = UnityEngine.Random.value < Ratio;
 					newMine.mineCoords = new Vector3 (i, j, k);
 
 					field [i, j, k] = newMine;
@@ -79,6 +83,9 @@ public class MineField : MonoBehaviour {
 		foreach(Renderer r in GetComponentsInChildren<Renderer>()) {
 			bounds.Encapsulate(r.bounds);
 		}
+
+		occlusion.center = bounds.center;
+		occlusion.size = bounds.size;
 
 		transform.localPosition = bounds.center * -1f;
 	}
