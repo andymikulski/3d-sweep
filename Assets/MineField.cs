@@ -192,7 +192,7 @@ public class MineField : MonoBehaviour {
 	}
 
 	public void BombExploded() {
-//		ToggleFocused (true);
+		ToggleFocused (false);
 
 		for (int x = 0; x < Size; x++) {
 			for (int y = 0; y < Size; y++) {
@@ -200,6 +200,7 @@ public class MineField : MonoBehaviour {
 					Mine mine = GetMineAtPos (new Vector3 (x, y, z));
 					if (mine.isMine) {
 						mine.Explode ();
+						mine.isSolid = true;
 					}
 				}
 			}

@@ -16,6 +16,7 @@ public class Mine : MonoBehaviour
 	public MineField field;
 	public Vector3 mineCoords;
 	private bool isTargeted = false;
+	private bool hasExploded = false;
 	private MeshRenderer mr;
 	private int mineCount = 1;
 
@@ -59,10 +60,10 @@ public class Mine : MonoBehaviour
 	}
 
 	public void Explode(){
-		Instantiate (explosion, gameObject.transform.position, new Quaternion ());
-		SetColor (Color.clear);
-
-		Destroy (gameObject);
+		Instantiate (explosion, gameObject.transform.position, Quaternion.Euler (Random.insideUnitSphere * 360));
+		hasExploded = true;
+//		SetColor (ExplodedMine);
+//		Destroy (gameObject);
 	}
 
 	void OnSelect() {
@@ -157,6 +158,10 @@ public class Mine : MonoBehaviour
 			} else {
 				newColor = NeutralState;
 			}
+		}
+
+		if (hasExploded) {
+			newColor = ExplodedMine;
 		}
 
 		if (isSolid) {
