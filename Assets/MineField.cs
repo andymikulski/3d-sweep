@@ -1,6 +1,7 @@
-﻿using System.Collections;
+﻿using UnityEngine;
+using System;
+using System.Collections;
 using System.Collections.Generic;
-using UnityEngine;
 
 public class MineField : MonoBehaviour {
 	public int Size = 3;
@@ -8,12 +9,24 @@ public class MineField : MonoBehaviour {
 	public GameObject mineFab;
 	private Mine[,,] field;
 
+
+	private Transform lastTarget;
+	private Transform currentTarget;
+
+	private Vector3 lastFocus;
+	private Vector3 currentFocus;
+
 	// Use this for initialization
 	void Start () {
 		Reset ();
 	}
 
 	public void Reset() {
+		// Remove children, if any
+		foreach (Transform child in transform) {
+			Destroy(child.gameObject);
+		}
+
 		field = new Mine[Size, Size, Size];
 
 		int halfwayPoint = Mathf.RoundToInt (Size / 2);
@@ -23,9 +36,9 @@ public class MineField : MonoBehaviour {
 				for (int k = 0; k < Size; k++) {
 					GameObject cube = Instantiate (mineFab, gameObject.transform) as GameObject;
 
-					Mine newMine = cube.AddComponent<Mine>();
+					Mine newMine = cube.GetComponent<Mine>();
 					newMine.field = this;
-					newMine.isMine = Random.value < 0.15;
+					newMine.isMine = UnityEngine.Random.value < 0.15;
 					newMine.mineCoords = new Vector3 (i, j, k);
 
 					field [i, j, k] = newMine;
@@ -35,6 +48,10 @@ public class MineField : MonoBehaviour {
 
 					if (i == halfwayPoint && j == halfwayPoint && k == halfwayPoint) {
 						Camera.main.GetComponent<MouseOrbitZoom>().target = cube.transform;
+						lastFocus = new Vector3 (i, j, k);
+						currentFocus = new Vector3 (i, j, k);
+						lastTarget = cube.transform;
+						currentTarget = cube.transform;
 					}
 				}
 			}
@@ -74,7 +91,12 @@ public class MineField : MonoBehaviour {
 			return null;
 		}
 
-		return field [(int)pos.x, (int)pos.y, (int)pos.z];
+		try {
+			return field [(int)pos.x, (int)pos.y, (int)pos.z];
+		}       
+		catch (NullReferenceException ex) {
+			return null;
+		}
 	}
 
 	public void ToggleFocused(bool display) {
@@ -88,6 +110,14 @@ public class MineField : MonoBehaviour {
 		}
 	}
 
+	public void FocusAround(Vector3 pos, bool clearFocusFirst) {
+		if (clearFocusFirst) {
+			ToggleFocused (false);
+		}
+
+		FocusAround (pos);
+	}
+
 	public void FocusAround(Vector3 pos) {
 		for (int x = -1; x <= 1; x++) {
 			for (int y = -1; y <= 1; y++) {
@@ -98,6 +128,24 @@ public class MineField : MonoBehaviour {
 					}
 				}
 			}
+		}
+
+		lastFocus = currentFocus;
+		currentFocus = pos;
+	}
+
+	public void FocusCamera(Transform target) {
+		lastTarget = currentTarget;
+		Camera.main.GetComponent<MouseOrbitZoom> ().target = target;
+		currentTarget = target;
+	}
+
+	void Update() {
+		if (Input.GetKeyDown (KeyCode.Space)) {
+			FocusAround (lastFocus, true);
+			FocusCamera (lastTarget);
+		} else if (Input.GetKeyDown (KeyCode.Return)) {
+			Reset ();
 		}
 	}
 

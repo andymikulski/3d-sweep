@@ -19,6 +19,13 @@ public class Mine : MonoBehaviour
 	private MeshRenderer mr;
 	private int mineCount = 1;
 
+	public Color NeutralState = new Color (1f, 0.309803922f, 0f, 1f);
+	public Color TargetedState;
+	public Color RevealedState;
+	public Color FlaggedState;
+	public Color TargetedFlaggedState;
+	public Color ExplodedMine;
+
 	private bool isExposed = false;
 
 	public GameObject explosion;
@@ -53,15 +60,12 @@ public class Mine : MonoBehaviour
 	}
 
 	void OnSelect() {
-		if (status == MineStatus.Flagged) {
-			return;
-		}
-
 		if (Input.GetKey (KeyCode.LeftShift)) {
-			Camera.main.GetComponent<MouseOrbitZoom> ().target = gameObject.transform;
 			isSolid = true;
-			field.ToggleFocused (false);
-			field.FocusAround (mineCoords);
+			field.FocusAround (mineCoords, true);
+			field.FocusCamera (transform);
+		} else if (status == MineStatus.Flagged) {
+			return;
 		} else if (isMine) {
 			field.BombExploded ();
 		} else if (!isExposed) {
@@ -90,7 +94,7 @@ public class Mine : MonoBehaviour
 	}
 		
 	void Update(){
-		Color newColor = new Color (1f, 0.309803922f, 0f, 1f);
+		Color newColor = NeutralState;
 
 		if (isTargeted){
 			if (Input.GetMouseButtonUp (0)) {
@@ -102,22 +106,24 @@ public class Mine : MonoBehaviour
 
 		if (status == MineStatus.Flagged) {
 			if (isTargeted) {
-				newColor = Color.magenta;
+				newColor = TargetedFlaggedState;
 			} else {
-				newColor = Color.blue;
+				newColor = FlaggedState;
 			}
 		} else if (status == MineStatus.Untouched) {
 			if (isTargeted && !isExposed) {
-				newColor = Color.yellow;
+				newColor = TargetedState;
+			} else if (isExposed) {
+				newColor = RevealedState;
 			} else {
-				newColor = new Color (1f, 0.309803922f, 0f, 1f);
+				newColor = NeutralState;
 			}
 		}
 
 		if (isSolid) {
 			newColor.a = 1f;
 		} else {
-			newColor.a = 0.1f;
+			newColor.a = 0.25f;
 		}
 
 		SetColor (newColor);
