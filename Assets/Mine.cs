@@ -170,7 +170,7 @@ public class Mine : MonoBehaviour
 			newColor.a = 0.25f;
 		}
 
-		transform.localScale = Vector3.Lerp (transform.localScale, Vector3.one * (isTargeted && Input.GetMouseButton (0) ? 0.95f : 1f), Time.deltaTime * 30f);
+		transform.localScale = Vector3.Lerp (transform.localScale, Vector3.one * (isTargeted && (Input.GetMouseButton (0) || Input.GetMouseButton (1)) ? 0.95f : 1f), Time.deltaTime * 30f);
 		SetColor (newColor);
 	}
 

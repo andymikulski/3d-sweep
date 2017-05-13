@@ -51,19 +51,18 @@ public class MineField : MonoBehaviour {
 					cube.layer = LayerMask.NameToLayer("Scene");
 
 					if (i == halfwayPoint && j == halfwayPoint && k == halfwayPoint) {
-						Camera.main.GetComponent<MouseOrbitZoom> ().SetTarget (cube.transform.position);
 						lastFocus = new Vector3 (i, j, k);
 						currentFocus = new Vector3 (i, j, k);
-						lastTarget = cube.transform.position;
-						currentTarget = cube.transform.position;
 					}
 				}
 			}
 		}
 
-		FocusAround (new Vector3 (halfwayPoint, halfwayPoint, halfwayPoint));
 		UpdateCounts ();
 		Center ();
+
+		FocusAround (new Vector3 (halfwayPoint, halfwayPoint, halfwayPoint), true);
+		FocusCamera ( GetMineAtPos(new Vector3 (halfwayPoint, halfwayPoint, halfwayPoint)).transform.position );
 	}
 
 	void UpdateCounts() {
