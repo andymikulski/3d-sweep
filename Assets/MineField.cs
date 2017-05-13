@@ -11,8 +11,8 @@ public class MineField : MonoBehaviour {
 
 	public float Ratio = 0.15f;
 
-	private Transform lastTarget;
-	private Transform currentTarget;
+	private Vector3 lastTarget;
+	private Vector3 currentTarget;
 
 	private Vector3 lastFocus;
 	private Vector3 currentFocus;
@@ -51,11 +51,11 @@ public class MineField : MonoBehaviour {
 					cube.layer = LayerMask.NameToLayer("Scene");
 
 					if (i == halfwayPoint && j == halfwayPoint && k == halfwayPoint) {
-						Camera.main.GetComponent<MouseOrbitZoom>().target = cube.transform;
+						Camera.main.GetComponent<MouseOrbitZoom> ().SetTarget (cube.transform.position);
 						lastFocus = new Vector3 (i, j, k);
 						currentFocus = new Vector3 (i, j, k);
-						lastTarget = cube.transform;
-						currentTarget = cube.transform;
+						lastTarget = cube.transform.position;
+						currentTarget = cube.transform.position;
 					}
 				}
 			}
@@ -101,7 +101,7 @@ public class MineField : MonoBehaviour {
 		try {
 			return field [(int)pos.x, (int)pos.y, (int)pos.z];
 		}       
-		catch (NullReferenceException ex) {
+		catch (NullReferenceException) {
 			return null;
 		}
 	}
@@ -141,9 +141,9 @@ public class MineField : MonoBehaviour {
 		currentFocus = pos;
 	}
 
-	public void FocusCamera(Transform target) {
+	public void FocusCamera(Vector3 target) {
 		lastTarget = currentTarget;
-		Camera.main.GetComponent<MouseOrbitZoom> ().target = target;
+		Camera.main.GetComponent<MouseOrbitZoom> ().SetTarget (target);
 		currentTarget = target;
 	}
 

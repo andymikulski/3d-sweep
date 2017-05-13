@@ -78,7 +78,7 @@ public class Mine : MonoBehaviour
 		if (Input.GetKey (KeyCode.LeftShift)) {
 			isSolid = true;
 			field.FocusAround (mineCoords, true);
-			field.FocusCamera (transform);
+			field.FocusCamera (transform.position);
 		} else if ((!ignoreFocus && !isSolid) || status == MineStatus.Flagged) {
 			return;
 		} else if (isMine) {

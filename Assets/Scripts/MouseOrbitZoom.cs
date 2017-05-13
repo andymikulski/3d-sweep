@@ -4,7 +4,7 @@ using System.Collections;
 [AddComponentMenu("Camera-Control/Mouse Orbit with zoom")]
 public class MouseOrbitZoom : MonoBehaviour {
  
-    public Transform target;
+	public Vector3 target = new Vector3();
     public float distance = 8.0f;
     public float xSpeed = 120.0f;
     public float ySpeed = 120.0f;
@@ -28,11 +28,12 @@ public class MouseOrbitZoom : MonoBehaviour {
         y = angles.x;
     }
 
+	public void SetTarget(Vector3 newTarget) {
+		target = newTarget;
+	}
+
     void Update () 
     {
-		if (target == null)
-			return;
-
 		Quaternion rotation = Quaternion.identity;
 
 		if (Input.GetKey (KeyCode.LeftShift) && Input.GetMouseButton (0)) {
@@ -49,7 +50,7 @@ public class MouseOrbitZoom : MonoBehaviour {
 		distance = Mathf.Clamp (distance - Input.GetAxis ("Mouse ScrollWheel") * 5, distanceMin, distanceMax);
 
 		Vector3 negDistance = new Vector3 (0.0f, 0.0f, -distance);
-		Vector3 position = rotation * negDistance + target.position;
+		Vector3 position = rotation * negDistance + target;
 	
 		transform.rotation = Quaternion.Lerp (transform.rotation, rotation, Time.deltaTime * smoothSpeed);
 		transform.position = Vector3.Lerp (transform.position, position, Time.deltaTime * smoothSpeed);
