@@ -4,18 +4,14 @@ using System.Collections.Generic;
 
 public class Mine : MonoBehaviour
 {
-	public enum MineStatus {
-		Untouched,
-		Flagged
-	};
-
-	public MineStatus status = MineStatus.Untouched;
-
-	public bool isSolid = false;
+	public bool isFocused = false;
 	public bool isMine = false;
+	public bool isExposed = false;
+	public bool isTargeted = false;
+	public bool isFlagged = false;
+
 	public MineField field;
 	public Vector3 mineCoords;
-	private bool isTargeted = false;
 	private bool hasExploded = false;
 	private MeshRenderer mr;
 	private int mineCount = 1;
@@ -27,22 +23,14 @@ public class Mine : MonoBehaviour
 	public Color TargetedFlaggedState;
 	public Color ExplodedMine;
 
-	private bool isExposed = false;
 
 	public GameObject explosion;
-//	public GameObject clickParticles;
-//	public GameObject particles;
 
 	void Start(){
-//		particles = Resources.Load ("ClickParticles") as GameObject;
-
 		gameObject.isStatic = true;
 
 		mr = GetComponent<MeshRenderer> ();
 		mr.material.EnableKeyword ("_EMISSION");
-
-		if (explosion == null)
-			explosion = Resources.Load ("PlasmaExplosionEffect") as GameObject;
 	}
 
 	void SetText(string txt) {
@@ -55,6 +43,10 @@ public class Mine : MonoBehaviour
 		}
 	}
 
+	public int GetMineCount() {
+		return mineCount;
+	}
+
 	public void SetMineCount(int count) {
 		mineCount = count;
 	}
@@ -62,77 +54,35 @@ public class Mine : MonoBehaviour
 	public void Explode(){
 		Instantiate (explosion, gameObject.transform.position, Quaternion.Euler (Random.insideUnitSphere * 360));
 		hasExploded = true;
-//		SetColor (ExplodedMine);
-//		Destroy (gameObject);
 	}
 
-	void OnSelect() {
-		OnSelect (false, false);
+	public void SetFlagged(bool flagged) {
+		isFlagged = flagged;
 	}
 
-	void OnAutoSelect(){
-		OnSelect (true, true);
-	}
-
-	void OnSelect(bool ignoreFocus, bool dontUseParticles) {
-		if (Input.GetKey (KeyCode.LeftShift)) {
-			isSolid = true;
-			field.FocusAround (mineCoords, true);
-			field.FocusCamera (transform.position);
-		} else if ((!ignoreFocus && !isSolid) || status == MineStatus.Flagged) {
-			return;
-		} else if (isMine) {
-			field.BombExploded ();
-		} else if (!isExposed) {
-			SetText (isMine ? "" : mineCount.ToString ());
-			isExposed = true;
-			isTargeted = false;
-
-//			if (!dontUseParticles) {
-//				clickParticles = Instantiate (particles, transform);
-//				clickParticles.transform.position = transform.position;
-//				clickParticles.GetComponent<ParticleSystem> ().Play ();
-//			}
-
-			// if this node doesn't have any mines, we click around its neighbors until we hit a 'border'
-			if (mineCount == 0) {
-				List<Mine> neighbors = field.GetNeighborsOfPoint (mineCoords);
-				foreach (Mine bor in neighbors) {
-					bor.OnAutoSelect ();
-				}
-
-				Destroy (gameObject);
-			}
-		}
-	}
-
-	void OnFlagToggle() {
-		if (status == MineStatus.Flagged) {
-			status = MineStatus.Untouched;
-		} else {
-			status = MineStatus.Flagged;
-		}
+	public void ToggleFlagged() {
+		isFlagged = !isFlagged;
 	}
 		
 	void Update(){
 		Color newColor = NeutralState;
 
+//
+//		if (isTargeted) {
+//			if (Input.GetMouseButtonUp (0)) {
+//				OnSelect ();
+//			} else if (!isExposed && Input.GetMouseButtonUp (1)) {
+//				OnFlagToggle ();
+//			}
+//		}
 
-		if (isTargeted) {
-			if (Input.GetMouseButtonUp (0)) {
-				OnSelect ();
-			} else if (!isExposed && Input.GetMouseButtonUp (1)) {
-				OnFlagToggle ();
-			}
-		}
-
-		if (status == MineStatus.Flagged) {
+		if (isFlagged) {
 			if (isTargeted) {
 				newColor = TargetedFlaggedState;
 			} else {
 				newColor = FlaggedState;
 			}
-		} else if (status == MineStatus.Untouched) {
+		} else {
 			if (isTargeted && !isExposed) {
 				newColor = TargetedState;
 			} else if (isExposed) {
@@ -164,35 +114,35 @@ public class Mine : MonoBehaviour
 			newColor = ExplodedMine;
 		}
 
-		if (isSolid) {
+		if (isFocused) {
 			newColor.a = 1f;
 		} else {
-			newColor.a = 0.25f;
+			newColor.a = isTargeted ? 0.5f : 0.25f;
 		}
 
 		transform.localScale = Vector3.Lerp (transform.localScale, Vector3.one * (isTargeted && (Input.GetMouseButton (0) || Input.GetMouseButton (1)) ? 0.95f : 1f), Time.deltaTime * 30f);
 		SetColor (newColor);
 	}
 
+	public void SetFocused(bool focus) {
+		isFocused = focus;
+	}
+
+	public void SetTargeted(bool targeted) {
+		isTargeted = targeted;
+	}
+
+	public void Reveal() {
+		SetText (isMine ? "" : mineCount.ToString ());
+		isExposed = true;
+	}
+
 	void SetColor(Color newColor){
 		mr.material.SetColor ("_Color", Color.Lerp (mr.material.color, newColor, Time.deltaTime * 5f));
-//		newColor.a = 0.25f;
-//		mr.material.SetColor ("_Emission", newColor);
 	}
 
-	void OnMouseEnter () {
-		if (Input.GetKey (KeyCode.LeftShift) && Input.GetMouseButton(0)) {
-			return;
-		}
-		isTargeted = true;
-	}
-
-	void onMouseDrag () {
-		isTargeted = false;
-	}
-
-	void OnMouseExit () {
-		isTargeted = false;
+	public Vector3 GetWorldPosition() {
+		return gameObject.transform.position;
 	}
 }
 

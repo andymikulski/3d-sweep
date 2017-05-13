@@ -11,6 +11,9 @@ public class MineField : MonoBehaviour {
 
 	public float Ratio = 0.15f;
 
+	private int BombCount = 0;
+//	private int FlagCount = 0;
+
 	private Vector3 lastTarget;
 	private Vector3 currentTarget;
 
@@ -18,6 +21,9 @@ public class MineField : MonoBehaviour {
 	private Vector3 currentFocus;
 
 	private OcclusionArea occlusion;
+
+	private Mine lastHoverMine = null;
+	private Mine lastHoverInactiveMine = null;
 
 	// Use this for initialization
 	void Start () {
@@ -35,6 +41,9 @@ public class MineField : MonoBehaviour {
 
 		int halfwayPoint = Mathf.RoundToInt (Size / 2);
 
+		BombCount = 0;
+//		FlagCount = 0;
+
 		for (int i = 0; i < Size; i++) {
 			for (int j = 0; j < Size; j++) {
 				for (int k = 0; k < Size; k++) {
@@ -43,6 +52,12 @@ public class MineField : MonoBehaviour {
 					Mine newMine = cube.GetComponent<Mine>();
 					newMine.field = this;
 					newMine.isMine = UnityEngine.Random.value < Ratio;
+
+					if (newMine.isMine) {
+						BombCount += 1;
+						newMine.SetFlagged (true);
+					}
+
 					newMine.mineCoords = new Vector3 (i, j, k);
 
 					field [i, j, k] = newMine;
@@ -63,6 +78,30 @@ public class MineField : MonoBehaviour {
 
 		FocusAround (new Vector3 (halfwayPoint, halfwayPoint, halfwayPoint), true);
 		FocusCamera ( GetMineAtPos(new Vector3 (halfwayPoint, halfwayPoint, halfwayPoint)).transform.position );
+	}
+
+	public void OnMineSelect(Mine mine) {
+		Vector3 mineCoords = mine.mineCoords;
+
+		if (Input.GetKey (KeyCode.LeftShift)) {
+			FocusAround (mineCoords, true);
+			FocusCamera (mine.gameObject.transform.position);
+		} else if (mine.isFlagged) {
+			return;
+		} else if (mine.isMine) {
+			BombExploded ();
+		} else if (!mine.isExposed) {
+			mine.Reveal();
+	
+			// if this node doesn't have any mines, we click around its neighbors until we hit a 'border'
+			if (mine.GetMineCount() == 0) {
+				List<Mine> neighbors = GetNeighborsOfPoint (mineCoords);
+				foreach (Mine bor in neighbors) {
+					OnMineSelect (bor);
+				}
+				Destroy (mine.gameObject);
+			}
+		}
 	}
 
 	void UpdateCounts() {
@@ -110,7 +149,9 @@ public class MineField : MonoBehaviour {
 			for (int y = 0; y < Size; y++) {
 				for (int z = 0; z < Size; z++) {
 					Mine neighbor = GetMineAtPos (new Vector3 (x, y, z));
-					neighbor.isSolid = display;
+					if (neighbor != null) {
+						neighbor.SetFocused (display);
+					}
 				}
 			}
 		}
@@ -130,7 +171,7 @@ public class MineField : MonoBehaviour {
 				for (int z = -1; z <= 1; z++) {
 					Mine neighbor = GetMineAtPos (pos + new Vector3 (x, y, z));
 					if (neighbor != null) {
-						neighbor.isSolid = true;
+						neighbor.SetFocused (true);
 					}
 				}
 			}
@@ -146,12 +187,73 @@ public class MineField : MonoBehaviour {
 		currentTarget = target;
 	}
 
+	Mine GetMousedMine() {
+		return GetMousedMine (false);
+	}
+
+	Mine GetMousedMine(bool includeInactive) {
+		Ray Alvarado = Camera.main.ScreenPointToRay(Input.mousePosition);
+		RaycastHit[] hits;
+		hits = Physics.RaycastAll(Alvarado);
+		int i = 0;
+		bool foundTarget = false;
+		Mine found = null;
+
+		while (i < hits.Length && !foundTarget) {
+			RaycastHit hit = hits[i];
+			GameObject obj = hit.collider.gameObject;
+			Mine target = obj.GetComponent<Mine> ();
+
+			if (includeInactive || target.isFocused) {
+				foundTarget = true;
+				found = target;
+			}
+			i++;
+		}
+
+		return found;
+	}
+
 	void Update() {
+		Mine target = GetMousedMine ();
+		if (target != lastHoverMine) {
+			if (target != null) { 
+				target.SetTargeted (true);
+			}
+
+			if (lastHoverMine != null) {
+				lastHoverMine.SetTargeted (false);
+			}
+			lastHoverMine = target;
+		}
+		Mine inactiveTarget = GetMousedMine (true);
+		if (inactiveTarget != lastHoverInactiveMine) {
+			if (inactiveTarget != null) { 
+				inactiveTarget.SetTargeted (true);
+			}
+
+			if (lastHoverInactiveMine != null) {
+				lastHoverInactiveMine.SetTargeted (false);
+			}
+			lastHoverInactiveMine = inactiveTarget;
+		}
+
 		if (Input.GetKeyDown (KeyCode.Space)) {
 			FocusAround (lastFocus, true);
 			FocusCamera (lastTarget);
 		} else if (Input.GetKeyDown (KeyCode.Return)) {
 			Reset ();
+
+			// User left clicked
+		} else if (Input.GetMouseButtonUp (0) && !Input.GetKey(KeyCode.LeftShift)) {
+			// And they had the left shift
+			if (Input.GetKey (KeyCode.LeftControl) && inactiveTarget != null) {
+				FocusAround (inactiveTarget.mineCoords, true);
+				FocusCamera (inactiveTarget.GetWorldPosition ());
+			} else if (target != null) {
+			// And they did NOT have the left shift 
+				OnMineSelect (target);
+			}
 		}
 	}
 
@@ -197,9 +299,9 @@ public class MineField : MonoBehaviour {
 			for (int y = 0; y < Size; y++) {
 				for (int z = 0; z < Size; z++) {
 					Mine mine = GetMineAtPos (new Vector3 (x, y, z));
-					if (mine.isMine) {
+					if (mine.isMine && !mine.isFlagged) {
 						mine.Explode ();
-						mine.isSolid = true;
+						mine.SetFocused (true);
 					}
 				}
 			}
