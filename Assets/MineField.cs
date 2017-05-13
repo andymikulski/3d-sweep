@@ -1,4 +1,5 @@
 ﻿using UnityEngine;
+using UnityEngine.UI;
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -12,7 +13,7 @@ public class MineField : MonoBehaviour {
 	public float Ratio = 0.15f;
 
 	private int BombCount = 0;
-//	private int FlagCount = 0;
+	private int FlagCount = 0;
 
 	private Vector3 lastTarget;
 	private Vector3 currentTarget;
@@ -22,13 +23,52 @@ public class MineField : MonoBehaviour {
 
 	private OcclusionArea occlusion;
 
+	private bool hadFirstClick = false;
+
 	private Mine lastHoverMine = null;
 	private Mine lastHoverInactiveMine = null;
+
+	private Text flagText;
+	private Text gameOverText;
+	private Text timerText;
+
+	private float timeStart = -1f;
+	private bool isPlaying = false;
+	private bool isGameOver = false;
 
 	// Use this for initialization
 	void Start () {
 		occlusion = gameObject.AddComponent<OcclusionArea> ();
+
+		flagText = GameObject.Find ("FlagText").GetComponent<Text> ();
+		timerText = GameObject.Find ("TimerText").GetComponent<Text> ();
+		gameOverText = GameObject.Find ("GameOverText").GetComponent<Text> ();
+
 		Reset ();
+	}
+
+	void UpdateGUI() {
+		flagText.text = "Flags: " + (BombCount - FlagCount);
+
+		if (timeStart < 0) {
+			timerText.text = "0:00";
+			return;
+		}
+
+		if (isPlaying) {
+			float now = Time.time;
+			float duration = now - timeStart;
+
+			float minutes = Mathf.Floor(duration / 60);
+			float seconds = Mathf.RoundToInt(duration % 60);
+
+			string displayedMins = minutes.ToString ();
+			string displayedSeconds = Mathf.RoundToInt (seconds).ToString ();
+
+			if(seconds < 10) { displayedSeconds = "0" + displayedSeconds; }
+
+			timerText.text = displayedMins + ":" + displayedSeconds;
+		}
 	}
 
 	public void Reset() {
@@ -37,12 +77,18 @@ public class MineField : MonoBehaviour {
 			Destroy(child.gameObject);
 		}
 
+		gameOverText.text = "";
+
 		field = new Mine[Size, Size, Size];
+		timeStart = -1;
+		isPlaying = false;
+		isGameOver = false;
+		hadFirstClick = false;
 
 		int halfwayPoint = Mathf.RoundToInt (Size / 2);
 
 		BombCount = 0;
-//		FlagCount = 0;
+		FlagCount = 0;
 
 		for (int i = 0; i < Size; i++) {
 			for (int j = 0; j < Size; j++) {
@@ -55,7 +101,6 @@ public class MineField : MonoBehaviour {
 
 					if (newMine.isMine) {
 						BombCount += 1;
-						newMine.SetFlagged (true);
 					}
 
 					newMine.mineCoords = new Vector3 (i, j, k);
@@ -80,6 +125,42 @@ public class MineField : MonoBehaviour {
 		FocusCamera ( GetMineAtPos(new Vector3 (halfwayPoint, halfwayPoint, halfwayPoint)).transform.position );
 	}
 
+	Mine DeMineIfy(Mine mine){
+		mine.isMine = false;
+
+		bool hasBeenReplaced = false;
+
+		// this is a little dangerous, technically if the whole map is mines,
+		// then this will never end
+		while (!hasBeenReplaced) {
+			Mine replacement = GetRandomMine ();
+			if (!replacement.isMine) {
+				replacement.isMine = true;
+				UpdateMine (replacement);
+				hasBeenReplaced = true;
+			}
+		}
+
+		UpdateMine (mine);
+
+		// update counts across the board since mines have moved
+		UpdateCounts ();
+
+		return mine;
+	}
+
+	void UpdateMine(Mine mine){
+		field [(int)mine.mineCoords.x, (int)mine.mineCoords.y, (int)mine.mineCoords.z] = mine;
+	}
+
+	Mine GetRandomMine() {
+		return field [GetRandomMineIndex (), GetRandomMineIndex (), GetRandomMineIndex ()];
+	}
+
+	int GetRandomMineIndex() {
+		return UnityEngine.Random.Range (0, Size);
+	}
+
 	public void OnMineSelect(Mine mine) {
 		Vector3 mineCoords = mine.mineCoords;
 
@@ -89,9 +170,24 @@ public class MineField : MonoBehaviour {
 		} else if (mine.isFlagged) {
 			return;
 		} else if (mine.isMine) {
+			// if this is the user's first click, it must _never_ be a mine
+			if (!hadFirstClick) {
+				// so we need to de-mine this guy, set something else as the bomb,
+				// and then update counts
+				OnMineSelect (DeMineIfy (mine));
+				return;
+			}
+
 			BombExploded ();
 		} else if (!mine.isExposed) {
+			if (!hadFirstClick) {
+				hadFirstClick = true;
+				isPlaying = true;
+				timeStart = Time.time;
+			}
+
 			mine.Reveal();
+			UpdateMine (mine);
 	
 			// if this node doesn't have any mines, we click around its neighbors until we hit a 'border'
 			if (mine.GetMineCount() == 0) {
@@ -101,7 +197,34 @@ public class MineField : MonoBehaviour {
 				}
 				Destroy (mine.gameObject);
 			}
+
+			CheckWinConditions ();
 		}
+	}
+
+	void CheckWinConditions(){
+		List<Mine> remainingSafe = GetRemainingSafeBoxes ();
+		List<Mine> flaggedBoxes = GetFlaggedBoxes ();
+		// if all of the safe boxes have been revealed, and the user has thrown down all the flags,
+		// they win!
+		if (remainingSafe.Count == 0 && flaggedBoxes.Count == BombCount){
+			Win();
+		}
+	}
+
+	void EndGame() {
+		isPlaying = false;
+		isGameOver = true;
+	}
+
+	void Win(){
+		EndGame ();
+		gameOverText.text = "you are winner ha ha ha";
+	}
+
+	void Lose(){
+		EndGame ();
+		gameOverText.text = "you lost, bummer!";
 	}
 
 	void UpdateCounts() {
@@ -157,6 +280,41 @@ public class MineField : MonoBehaviour {
 		}
 	}
 
+	List<Mine> GetFlaggedBoxes(){
+		List<Mine> flagged = new List<Mine> ();
+
+		for (int x = 0; x < Size; x++) {
+			for (int y = 0; y < Size; y++) {
+				for (int z = 0; z < Size; z++) {
+					Mine mine = GetMineAtPos (new Vector3 (x, y, z));
+					if (mine != null && !mine.isExposed && mine.isFlagged) {
+						Debug.Log ("adding mine " + mine.mineCoords.ToString ());
+						flagged.Add (mine);
+					}
+				}
+			}
+		}
+
+		return flagged;
+	}
+
+	List<Mine> GetRemainingSafeBoxes(){
+		List<Mine> remaining = new List<Mine> ();
+
+		for (int x = 0; x < Size; x++) {
+			for (int y = 0; y < Size; y++) {
+				for (int z = 0; z < Size; z++) {
+					Mine mine = GetMineAtPos (new Vector3 (x, y, z));
+					if (mine != null && !mine.isExposed && !mine.isMine) {
+						remaining.Add (mine);
+					}
+				}
+			}
+		}
+
+		return remaining;
+	}
+
 	public void FocusAround(Vector3 pos, bool clearFocusFirst) {
 		if (clearFocusFirst) {
 			ToggleFocused (false);
@@ -204,7 +362,7 @@ public class MineField : MonoBehaviour {
 			GameObject obj = hit.collider.gameObject;
 			Mine target = obj.GetComponent<Mine> ();
 
-			if (includeInactive || target.isFocused) {
+			if (hit.distance >= 4f && (includeInactive || target.isFocused)) {
 				foundTarget = true;
 				found = target;
 			}
@@ -215,14 +373,25 @@ public class MineField : MonoBehaviour {
 	}
 
 	void Update() {
+		if (isGameOver) {
+			if (Input.GetKeyDown (KeyCode.Return)) {
+				Reset ();
+			}
+			return;
+		}
+
+		UpdateGUI ();
+
 		Mine target = GetMousedMine ();
 		if (target != lastHoverMine) {
 			if (target != null) { 
 				target.SetTargeted (true);
+				UpdateMine (target);
 			}
 
 			if (lastHoverMine != null) {
 				lastHoverMine.SetTargeted (false);
+				UpdateMine (lastHoverMine);
 			}
 			lastHoverMine = target;
 		}
@@ -230,10 +399,12 @@ public class MineField : MonoBehaviour {
 		if (inactiveTarget != lastHoverInactiveMine) {
 			if (inactiveTarget != null) { 
 				inactiveTarget.SetTargeted (true);
+				UpdateMine (inactiveTarget);
 			}
 
 			if (lastHoverInactiveMine != null) {
 				lastHoverInactiveMine.SetTargeted (false);
+				UpdateMine (lastHoverInactiveMine);
 			}
 			lastHoverInactiveMine = inactiveTarget;
 		}
@@ -245,16 +416,26 @@ public class MineField : MonoBehaviour {
 			Reset ();
 
 			// User left clicked
-		} else if (Input.GetMouseButtonUp (0) && !Input.GetKey(KeyCode.LeftShift)) {
+		} else if (Input.GetMouseButtonUp (0) && !Input.GetKey (KeyCode.LeftShift)) {
 			// And they had the left shift
 			if (Input.GetKey (KeyCode.LeftControl) && inactiveTarget != null) {
 				FocusAround (inactiveTarget.mineCoords, true);
 				FocusCamera (inactiveTarget.GetWorldPosition ());
 			} else if (target != null) {
-			// And they did NOT have the left shift 
+				// And they did NOT have the left shift 
 				OnMineSelect (target);
 			}
+		} else if (Input.GetMouseButtonUp (1) && target != null) {
+			if (!target.isExposed && !target.hasExploded) {
+				FlagCount += target.ToggleFlagged () ? 1 : -1;
+
+				UpdateMine (target);
+
+				CheckWinConditions ();
+			}
 		}
+
+
 	}
 
 	public List<Mine> GetNeighborsOfPoint(Vector3 pos) {
@@ -306,5 +487,7 @@ public class MineField : MonoBehaviour {
 				}
 			}
 		}
+
+		Lose ();
 	}
 }

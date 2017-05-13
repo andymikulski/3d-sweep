@@ -9,10 +9,10 @@ public class Mine : MonoBehaviour
 	public bool isExposed = false;
 	public bool isTargeted = false;
 	public bool isFlagged = false;
+	public bool hasExploded = false;
 
 	public MineField field;
 	public Vector3 mineCoords;
-	private bool hasExploded = false;
 	private MeshRenderer mr;
 	private int mineCount = 1;
 
@@ -23,14 +23,16 @@ public class Mine : MonoBehaviour
 	public Color TargetedFlaggedState;
 	public Color ExplodedMine;
 
-
 	public GameObject explosion;
+
+	private Color targetColor;
 
 	void Start(){
 		gameObject.isStatic = true;
 
 		mr = GetComponent<MeshRenderer> ();
 		mr.material.EnableKeyword ("_EMISSION");
+
 	}
 
 	void SetText(string txt) {
@@ -60,21 +62,14 @@ public class Mine : MonoBehaviour
 		isFlagged = flagged;
 	}
 
-	public void ToggleFlagged() {
+	public bool ToggleFlagged() {
 		isFlagged = !isFlagged;
+
+		return isFlagged;
 	}
 		
 	void Update(){
 		Color newColor = NeutralState;
-
-//
-//		if (isTargeted) {
-//			if (Input.GetMouseButtonUp (0)) {
-//				OnSelect ();
-//			} else if (!isExposed && Input.GetMouseButtonUp (1)) {
-//				OnFlagToggle ();
-//			}
-//		}
 
 		if (isFlagged) {
 			if (isTargeted) {
@@ -120,7 +115,15 @@ public class Mine : MonoBehaviour
 			newColor.a = isTargeted ? 0.5f : 0.25f;
 		}
 
-		transform.localScale = Vector3.Lerp (transform.localScale, Vector3.one * (isTargeted && (Input.GetMouseButton (0) || Input.GetMouseButton (1)) ? 0.95f : 1f), Time.deltaTime * 30f);
+		targetColor = newColor;
+
+		// if we're not visible, dont bother lerping the material color etc
+		if (!mr.isVisible) {
+			mr.material.SetColor ("_Color", targetColor);
+			return;
+		}
+
+		transform.localScale = Vector3.Lerp (transform.localScale, Vector3.one * (isTargeted && isFocused && (Input.GetMouseButton (0) || Input.GetMouseButton (1)) ? 0.95f : 1f), Time.deltaTime * 30f);
 		SetColor (newColor);
 	}
 
