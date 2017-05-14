@@ -1,5 +1,7 @@
 ﻿using UnityEngine;
 using UnityEngine.UI;
+using UnityEngine.Analytics;
+
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -35,6 +37,8 @@ public class MineField : MonoBehaviour {
 	private float timeStart = -1f;
 	private bool isPlaying = false;
 	private bool isGameOver = false;
+
+	private int a_PlayCount = 0;
 
 	// Use this for initialization
 	void Start () {
@@ -150,6 +154,10 @@ public class MineField : MonoBehaviour {
 	}
 
 	void UpdateMine(Mine mine){
+		if (mine == null) {
+			return;
+		}
+
 		field [(int)mine.mineCoords.x, (int)mine.mineCoords.y, (int)mine.mineCoords.z] = mine;
 	}
 
@@ -164,12 +172,19 @@ public class MineField : MonoBehaviour {
 	public void OnMineSelect(Mine mine) {
 		Vector3 mineCoords = mine.mineCoords;
 
-		if (Input.GetKey (KeyCode.LeftShift)) {
-			FocusAround (mineCoords, true);
-			FocusCamera (mine.gameObject.transform.position);
-		} else if (mine.isFlagged) {
+		if (mine.isFlagged) {
+			Analytics.CustomEvent("userClickedFlaggedBox", new Dictionary<string, object> {
+				{ "timeSinceStart", Time.time - timeStart },
+				{ "coords", mine.mineCoords.ToString() }
+			});
+
 			return;
 		} else if (mine.isMine) {
+			Analytics.CustomEvent("userClickedSleepingMine", new Dictionary<string, object> {
+				{ "timeSinceStart", Time.time - timeStart },
+				{ "coords", mine.mineCoords.ToString() }
+			});
+
 			// if this is the user's first click, it must _never_ be a mine
 			if (!hadFirstClick) {
 				// so we need to de-mine this guy, set something else as the bomb,
@@ -180,10 +195,21 @@ public class MineField : MonoBehaviour {
 
 			BombExploded ();
 		} else if (!mine.isExposed) {
+			Analytics.CustomEvent("userClickedSafeBox", new Dictionary<string, object> {
+				{ "timeSinceStart", Time.time - timeStart },
+				{ "coords", mine.mineCoords.ToString() },
+				{ "mineCount", mine.GetMineCount() }
+			});
+
 			if (!hadFirstClick) {
+				a_PlayCount += 1;
 				hadFirstClick = true;
 				isPlaying = true;
 				timeStart = Time.time;
+
+				Analytics.CustomEvent("gameStart", new Dictionary<string, object> {
+					{ "playCount", a_PlayCount }
+				});
 			}
 
 			mine.Reveal();
@@ -192,6 +218,13 @@ public class MineField : MonoBehaviour {
 			// if this node doesn't have any mines, we click around its neighbors until we hit a 'border'
 			if (mine.GetMineCount() == 0) {
 				List<Mine> neighbors = GetNeighborsOfPoint (mineCoords);
+
+				Analytics.CustomEvent("userClickedEmptyBox", new Dictionary<string, object> {
+					{ "timeSinceStart", Time.time - timeStart },
+					{ "coords", mine.mineCoords.ToString() },
+					{ "neighborCount", neighbors.Count }
+				});
+
 				foreach (Mine bor in neighbors) {
 					OnMineSelect (bor);
 				}
@@ -213,16 +246,37 @@ public class MineField : MonoBehaviour {
 	}
 
 	void EndGame() {
+		Analytics.CustomEvent("gameEnded", new Dictionary<string, object> {
+			{ "timeSinceStart", Time.time - timeStart },
+			{ "remainingCount", GetRemainingSafeBoxes().Count },
+			{ "flaggedCount", GetFlaggedBoxes().Count },
+			{ "totalBombs", BombCount },
+		});
+
 		isPlaying = false;
 		isGameOver = true;
 	}
 
 	void Win(){
+		Analytics.CustomEvent("userWon", new Dictionary<string, object> {
+			{ "timeSinceStart", Time.time - timeStart },
+			{ "remainingCount", GetRemainingSafeBoxes().Count },
+			{ "flaggedCount", GetFlaggedBoxes().Count },
+			{ "totalBombs", BombCount },
+		});
+
 		EndGame ();
 		gameOverText.text = "you are winner ha ha ha";
 	}
 
 	void Lose(){
+		Analytics.CustomEvent("userLost", new Dictionary<string, object> {
+			{ "timeSinceStart", Time.time - timeStart },
+			{ "remainingCount", GetRemainingSafeBoxes().Count },
+			{ "flaggedCount", GetFlaggedBoxes().Count },
+			{ "totalBombs", BombCount },
+		});
+
 		EndGame ();
 		gameOverText.text = "you lost, bummer!";
 	}
@@ -239,7 +293,7 @@ public class MineField : MonoBehaviour {
 	}
 
 	void Center() {
-		Bounds bounds = new Bounds(transform.position, Vector3.zero);
+		Bounds bounds = new Bounds(Vector3.zero, Vector3.zero);
 
 		foreach(Renderer r in GetComponentsInChildren<Renderer>()) {
 			bounds.Encapsulate(r.bounds);
@@ -375,6 +429,9 @@ public class MineField : MonoBehaviour {
 	void Update() {
 		if (isGameOver) {
 			if (Input.GetKeyDown (KeyCode.Return)) {
+				Analytics.CustomEvent("restartAfterGameOver", new Dictionary<string, object> {
+					{ "playCount", a_PlayCount },
+				});
 				Reset ();
 			}
 			return;
@@ -412,16 +469,32 @@ public class MineField : MonoBehaviour {
 		if (Input.GetKeyDown (KeyCode.Space)) {
 			FocusAround (lastFocus, true);
 			FocusCamera (lastTarget);
+
+			Analytics.CustomEvent("userJumpedToLastFocus", new Dictionary<string, object> {});
 		} else if (Input.GetKeyDown (KeyCode.Return)) {
 			Reset ();
+
+			Analytics.CustomEvent("userResetGame", new Dictionary<string, object> {
+				{ "playCount", a_PlayCount },
+			});
 
 			// User left clicked
 		} else if (Input.GetMouseButtonUp (0) && !Input.GetKey (KeyCode.LeftShift)) {
 			// And they had the left shift
 			if (Input.GetKey (KeyCode.LeftControl) && inactiveTarget != null) {
+				Analytics.CustomEvent("userChangedCameraFocusToInactive", new Dictionary<string, object> {
+					{ "timeSinceStart", Time.time - timeStart },
+					{ "coords", inactiveTarget.mineCoords.ToString() }
+				});
+
 				FocusAround (inactiveTarget.mineCoords, true);
 				FocusCamera (inactiveTarget.GetWorldPosition ());
 			} else if (target != null) {
+				Analytics.CustomEvent("userChangedCameraFocusToActive", new Dictionary<string, object> {
+					{ "timeSinceStart", Time.time - timeStart },
+					{ "coords", target.mineCoords.ToString() }
+				});
+
 				// And they did NOT have the left shift 
 				OnMineSelect (target);
 			}
@@ -429,8 +502,12 @@ public class MineField : MonoBehaviour {
 			if (!target.isExposed && !target.hasExploded) {
 				FlagCount += target.ToggleFlagged () ? 1 : -1;
 
-				UpdateMine (target);
+				Analytics.CustomEvent("userToggledFlag", new Dictionary<string, object> {
+					{ "timeSinceStart", Time.time - timeStart },
+					{ "count", FlagCount }
+				});
 
+				UpdateMine (target);
 				CheckWinConditions ();
 			}
 		}

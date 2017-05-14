@@ -1,5 +1,7 @@
 using UnityEngine;
+using UnityEngine.Analytics;
 using System.Collections;
+using System.Collections.Generic;
  
 [AddComponentMenu("Camera-Control/Mouse Orbit with zoom")]
 public class MouseOrbitZoom : MonoBehaviour {
@@ -47,7 +49,17 @@ public class MouseOrbitZoom : MonoBehaviour {
 		y = ClampAngle (y, yMinLimit, yMaxLimit);
 		rotation = Quaternion.Euler (y, x, 0);
 
-		distance = Mathf.Clamp (distance - Input.GetAxis ("Mouse ScrollWheel") * 5, distanceMin, distanceMax);
+		float scrollValue = Input.GetAxis ("Mouse ScrollWheel");
+
+		distance = Mathf.Clamp (distance - scrollValue * 5, distanceMin, distanceMax);
+
+		if (scrollValue != 0) {
+			Analytics.CustomEvent("userScrolledMousewheel", new Dictionary<string, object> {
+				{ "value", scrollValue },
+				{ "distance", distance }
+			});
+		}
+
 
 		Vector3 negDistance = new Vector3 (0.0f, 0.0f, -distance);
 		Vector3 position = rotation * negDistance + target;
